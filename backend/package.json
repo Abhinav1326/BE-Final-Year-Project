@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "server": "nodemon server.js"
   },
   "author": "",
   "license": "ISC",
@@ -16,7 +17,7 @@
     "mongodb": "^6.10.0",
     "mongoose": "^8.8.1",
     "multer": "^1.4.5-lts.1",
-    "nodemon": "^3.1.7",
+    "nodemon": "^3.1.10",
     "pdf-parse": "^1.1.1",
     "puppeteer": "^22.12.1",
     "puppeteer-core": "^22.12.1",

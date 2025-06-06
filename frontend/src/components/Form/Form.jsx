@@ -82,7 +82,10 @@ const Form = () => {
                         {/* <input id="file" type="file" name="file" onChange={(e) => setFile(e.target.files[0])} /> */}
                         <input id="file" type="file" name="file" onChange={handleFile} />
                     </div>
-                    <button className="form-submit-btn" type="submit">Apply</button>
+                    <div className="portalBtns">
+                        <button className="form-submit-btn" type="submit">Naukri.com</button>
+                        <button className="form-submit-btn" type="submit">Internshala</button>
+                    </div>
                 </form>
 
                 {/* <p className="signup-link">

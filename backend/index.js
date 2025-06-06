@@ -25,9 +25,47 @@ const mongoose = require('mongoose');
 mongoose.connect('mongodb+srv://abhinavgore1326:Abhinav%401326@job-portal-automation.kmjkm.mongodb.net/?retryWrites=true&w=majority&appName=job-portal-automation');
 const User = require('./userModel');
 
+const uri = "mongodb+srv://abhinavgore1326:Abhinav%401326@job-portal-automation.kmjkm.mongodb.net/?retryWrites=true&w=majority&appName=job-portal-automation";
+const { MongoClient, ServerApiVersion } = require('mongodb');
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
 
 async function run() {
     try {
+
+
+        await client.connect();
+        const postCollection = client.db("database").collection("posts"); // this collection is for team-ekt
+        const userCollection = client.db("database").collection("users");
+
+        app.get('/user', async (req, res) => {
+            const user = await userCollection.find().toArray();
+            res.send(user);
+        })
+        app.get('/loggedInUser', async (req, res) => {
+            const email = req.query.email;
+            const user = await userCollection.find({ email: email }).toArray();
+            res.send(user);
+        })
+
+        app.post('/register', async (req, res) => {
+            const user = req.body;
+            const result = await userCollection.insertOne(user);
+            res.send(result); 
+        })
+
+
+        app.get('/userPost', async (req, res) => {
+            const email = req.query.email;
+            const id = email;
+            const post = (await postCollection.find({ id: id }).toArray()).reverse();
+            // const posts = await postCollection.find({ id: id }).toArray();
+            res.send(post);
+        })
+ 
+
+
+
         // post
         const path = './files';
 
@@ -67,7 +105,9 @@ async function run() {
                 // console.log(data.text);
                 const resumeText = data.text;
                 // console.log(resumeText);
-                internshipApply(resumeText, id, password);
+                // internshipApply(resumeText, id, password);
+                naukriApply(resumeText, id, password, postCollection);
+                // internshipApply(resumeText);
             }).catch(function (error) {
                 console.error("Error parsing PDF:", error);
             });
@@ -88,6 +128,89 @@ app.listen(port, () => {
 })
 
 
+async function naukriApply(resume, id, password, postCollection) {
+    const browser = await puppeteerExtra.launch({
+            headless: false,
+            defaultViewport: null
+        });
+    
+    const page = await browser.newPage();
+    await page.goto('https://www.naukri.com/mnjuser/recommendedjobs?src=gnbOpportunities');
+    // await page.type("#usernameField", "abhinavgore1326@gmail.com");
+    // await page.type("#passwordField", "Abhinav@1326");
+    await page.type("#usernameField", id);
+    await page.type("#passwordField", password);
+    await page.click(".blue-btn");
+    
+    try {
+        await page.waitForNavigation({ waitUntil: "networkidle2" });
+    } catch (error) {
+        if (error.message.includes('Navigating frame was detached')) {
+            console.log('Frame was detached, retrying navigation...');
+            await page.goto('https://www.naukri.com/mnjuser/recommendedjobs?src=gnbOpportunities');
+            // await page.type("#usernameField", "abhinavgore.sit.it@gmail.com");
+            // await page.type("#passwordField", "Abhinav@1326");
+            await page.type("#usernameField", id);
+            await page.type("#passwordField", password);
+            await page.click(".blue-btn");
+            await page.waitForNavigation({ waitUntil: "networkidle2" });
+        } else {
+            throw error;
+        }
+    }
+    
+    
+    
+    
+    await page.waitForSelector(".naukicon-ot-checkbox", {visible : true}); 
+    
+    await page.$$eval('.naukicon-ot-checkbox', (elements) => {
+        elements.slice(0, 5).forEach(el => el.click());
+    });
+    
+    // const jobData = await page.evaluate(() => {
+    // const elements = Array.from(document.querySelectorAll('.info.dspIB'));
+    // return elements.slice(0, 5).map(el => {
+    //     const title = el.querySelector('p.title')?.textContent.trim() || '';
+    //     const subtitle = el.querySelector('.subTitle')?.textContent.trim() || '';
+    //     const location = el.querySelector('li.location span')?.textContent.trim() || '';
+    //     return { title, subtitle, location };
+    // });
+    // });
+    
+    const jobData = await page.evaluate((id) => {
+        // Get all job cards
+        const jobCards = Array.from(document.querySelectorAll('article.jobTuple.bgWhite.z-depth-1'));
+    
+        const filteredJobs = jobCards.filter(card =>
+          card.querySelector('.dspIB.saveJobContainer.tuple-check-box > i.dspIB.naukicon.naukicon-ot-Checked')
+        ).slice(0, 5); // Take only the first 5 matching elements
+    
+        return filteredJobs.map(card => {
+          const title = card.querySelector('.title.ellipsis.typ-16Bold')?.innerText.trim() || '';
+          const subtitle = card.querySelector('.companyWrapper .subTitle')?.innerText.trim() || '';
+          const location = card.querySelector('.placeHolderLi.location span')?.innerText.trim() || '';
+          return { title, subtitle, location, id };
+        });
+      }, id);
+    
+    console.log(jobData);
+    
+    // await page.click(".multi-apply-button");
+    console.log("Clicked on multi-apply button");
+
+    
+    if (postCollection) {
+        if (jobData.length > 0) {
+            await postCollection.insertMany(jobData);
+        }
+    }
+    
+    // await page.waitForNavigation({ waitUntil: "networkidle2" });
+    await browser.close();
+}
+ 
+
 async function internshipApply(resume, id, password) {
     
 
@@ -101,12 +224,12 @@ async function internshipApply(resume, id, password) {
     await page.goto('https://internshala.com/');
     await page.waitForSelector("#modal_login_submit");
     await page.click(".login-cta");
-    // await page.type("#modal_email", "abhinavgore.sit.it@gmail.com");
+    await page.type("#modal_email", "abhinavgore.sit.it@gmail.com");
     // await page.type("#modal_password", "Abhinav@1326");
-    await page.type("#modal_email", id);
-    await page.type("#modal_password", password);
-    await page.click("#modal_login_submit");
-
+    // await page.type("#modal_email", id);
+    // await page.type("#modal_password", password);
+    // await page.click("#modal_login_submit");
+ 
     try {
         await page.waitForNavigation({ waitUntil: "networkidle2" });
     } catch (error) {
@@ -114,10 +237,10 @@ async function internshipApply(resume, id, password) {
             console.log('Frame was detached, retrying navigation...');
             await page.goto('https://internshala.com/');
             await page.waitForSelector("#modal_login_submit");
-            await page.click(".login-cta");
-            await page.type("#modal_email", id);
-            await page.type("#modal_password", password);
-            await page.click("#modal_login_submit");
+            await page.click(".login-cta"); 
+            // await page.type("#modal_email", id);
+            // await page.type("#modal_password", password);
+            // await page.click("#modal_login_submit");
             await page.waitForNavigation({ waitUntil: "networkidle2" });
         } else {
             throw error;
